@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MasterDnsVPN — رابط گرافیکی ویندوز</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Vazirmatn:wght@300;400;600;700;900&display=swap');
+
+:root {
+  --bg:     #060a0e;
+  --s1:     #0d1117;
+  --s2:     #161b22;
+  --s3:     #21262d;
+  --border: #2d333b;
+  --acc:    #00d4aa;
+  --acc2:   #7c5cfc;
+  --ok:     #3fb950;
+  --warn:   #e3b341;
+  --err:    #f85149;
+  --txt:    #cdd9e5;
+  --txt2:   #768390;
+  --txt3:   #444c56;
+  --mono:   'IBM Plex Mono', monospace;
+  --sans:   'Vazirmatn', sans-serif;
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+html,body{height:100%;overflow:hidden}
+
+body{
+  background:var(--bg);
+  color:var(--txt);
+  font-family:var(--sans);
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+}
+
+/* ── TOP BAR ── */
+.topbar{
+  display:flex;align-items:center;gap:1rem;
+  padding:.6rem 1.2rem;
+  background:var(--s1);
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+  user-select:none;
+}
+.tb-icon{
+  width:36px;height:36px;border-radius:9px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--acc),var(--acc2));
+  display:flex;align-items:center;justify-content:center;font-size:1.2rem;
+  box-shadow:0 0 14px rgba(0,212,170,.25);
+}
+.tb-title{font-size:1rem;font-weight:900}
+.tb-sub{font-size:.7rem;color:var(--txt3);margin-top:.1rem}
+.tb-spacer{flex:1}
+.status-pill{
+  display:flex;align-items:center;gap:.5rem;
+  padding:.3rem .9rem;border-radius:20px;
+  border:1px solid var(--border);font-size:.78rem;font-weight:600;
+  transition:all .3s;
+}
+.status-pill .dot{width:8px;height:8px;border-radius:50%;background:var(--txt3);transition:background .3s}
+.status-pill.connected{border-color:var(--ok);color:var(--ok)}
+.status-pill.connected .dot{background:var(--ok);box-shadow:0 0 6px var(--ok);animation:pulse 2s infinite}
+.status-pill.connecting{border-color:var(--warn);color:var(--warn)}
+.status-pill.connecting .dot{background:var(--warn);animation:pulse .8s infinite}
+.status-pill.error{border-color:var(--err);color:var(--err)}
+.status-pill.error .dot{background:var(--err)}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(1.4)}}
+
+/* ── LAYOUT ── */
+.layout{display:flex;flex:1;overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{
+  width:52px;background:var(--s1);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;align-items:center;padding:.5rem 0;gap:.25rem;
+  flex-shrink:0;
+}
+.sbi{
+  width:38px;height:38px;border-radius:9px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:1.1rem;
+  color:var(--txt3);transition:all .15s;position:relative;
+}
+.sbi:hover{background:var(--s3);color:var(--txt)}
+.sbi.active{background:var(--s2);color:var(--acc);box-shadow:inset 2px 0 0 var(--acc)}
+.sbi-spacer{flex:1}
+.sbi[title]:hover::after{
+  content:attr(title);position:absolute;right:calc(100% + 8px);
+  background:var(--s3);border:1px solid var(--border);
+  padding:.3rem .6rem;border-radius:6px;font-size:.72rem;
+  white-space:nowrap;color:var(--txt);font-family:var(--sans);z-index:99;
+}
+
+/* ── MAIN CONTENT ── */
+.main{flex:1;overflow:hidden;display:flex;flex-direction:column}
+.page{display:none;flex:1;overflow:hidden;flex-direction:column;padding:1rem 1.2rem;gap:.8rem}
+.page.active{display:flex}
+
+/* ── CONNECT PAGE ── */
+.connect-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:.7rem;
+}
+.field{display:flex;flex-direction:column;gap:.3rem}
+.field.full{grid-column:1/-1}
+.field label{font-size:.72rem;color:var(--txt2);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+.field input,.field select,.field textarea{
+  background:var(--s2);border:1px solid var(--border);
+  border-radius:7px;padding:.5rem .75rem;color:var(--txt);
+  font-size:.82rem;font-family:var(--sans);transition:border .2s;
+  outline:none;
+}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--acc)}
+.field input::placeholder{color:var(--txt3)}
+.field select option{background:var(--s2)}
+.field textarea{resize:vertical;min-height:70px;font-family:var(--mono);font-size:.75rem}
+
+.btn-row{display:flex;gap:.6rem;grid-column:1/-1;margin-top:.3rem}
+.btn{
+  padding:.55rem 1.2rem;border-radius:8px;font-family:var(--sans);
+  font-size:.82rem;font-weight:700;cursor:pointer;border:none;
+  transition:all .15s;display:flex;align-items:center;gap:.4rem;
+}
+.btn-connect{background:linear-gradient(135deg,var(--acc),#00a08a);color:#000;flex:1;justify-content:center}
+.btn-connect:hover{opacity:.9;transform:translateY(-1px)}
+.btn-connect:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-stop{background:rgba(248,81,73,.15);border:1px solid var(--err);color:var(--err)}
+.btn-stop:hover{background:rgba(248,81,73,.25)}
+.btn-stop:disabled{opacity:.4;cursor:not-allowed}
+.btn-secondary{background:var(--s3);border:1px solid var(--border);color:var(--txt2)}
+.btn-secondary:hover{color:var(--txt);border-color:var(--txt3)}
+
+.alert{
+  padding:.6rem .9rem;border-radius:7px;font-size:.78rem;
+  border:1px solid var(--border);display:flex;align-items:center;gap:.5rem;
+}
+.alert-warn{background:rgba(227,179,65,.08);border-color:var(--warn);color:var(--warn)}
+.alert-ok{background:rgba(63,185,80,.08);border-color:var(--ok);color:var(--ok)}
+.alert-err{background:rgba(248,81,73,.08);border-color:var(--err);color:var(--err)}
+.alert-info{background:rgba(0,212,170,.06);border-color:var(--acc);color:var(--acc)}
+
+/* ── LOG PAGE ── */
+.log-toolbar{display:flex;align-items:center;gap:.5rem;flex-shrink:0}
+.log-toolbar span{font-size:.72rem;padding:.2rem .6rem;border-radius:5px;background:var(--s3);
+  border:1px solid var(--border);cursor:pointer;font-family:var(--mono);white-space:nowrap}
+.log-toolbar span:hover{border-color:var(--txt3)}
+.log-filters{display:flex;gap:.3rem}
+.lf{font-size:.7rem;padding:.15rem .5rem;border-radius:4px;cursor:pointer;
+  border:1px solid transparent;font-family:var(--mono)}
+.lf.active-info{background:rgba(0,212,170,.15);border-color:var(--acc);color:var(--acc)}
+.lf.active-warn{background:rgba(227,179,65,.15);border-color:var(--warn);color:var(--warn)}
+.lf.active-err{background:rgba(248,81,73,.15);border-color:var(--err);color:var(--err)}
+.lf:not(.active-info):not(.active-warn):not(.active-err){color:var(--txt3)}
+.lf:hover{color:var(--txt)}
+
+.log-area{
+  flex:1;overflow-y:auto;background:var(--s1);border:1px solid var(--border);
+  border-radius:9px;padding:.7rem;font-family:var(--mono);font-size:.76rem;line-height:1.8;
+}
+.log-area::-webkit-scrollbar{width:5px}
+.log-area::-webkit-scrollbar-track{background:transparent}
+.log-area::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.log-line{display:flex;gap:.6rem;padding:.05rem 0}
+.log-line:hover{background:var(--s2);border-radius:4px}
+.lt{color:var(--txt3);flex-shrink:0}
+.ll{flex-shrink:0;width:42px}
+.lm{color:var(--txt);word-break:break-all}
+.ll-info{color:var(--acc)}
+.ll-warn{color:var(--warn)}
+.ll-error{color:var(--err)}
+.ll-debug{color:var(--txt3)}
+.log-empty{color:var(--txt3);text-align:center;padding:2rem;font-size:.8rem}
+
+/* ── STATS ── */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem}
+.stat-card{
+  background:var(--s2);border:1px solid var(--border);border-radius:9px;
+  padding:.9rem 1rem;
+}
+.stat-label{font-size:.68rem;color:var(--txt3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem}
+.stat-val{font-size:1.4rem;font-weight:700;font-family:var(--mono)}
+.stat-unit{font-size:.72rem;color:var(--txt2);margin-right:.2rem}
+.val-ok{color:var(--ok)}
+.val-warn{color:var(--warn)}
+.val-err{color:var(--err)}
+
+/* ── SOCKS5 HELPER ── */
+.socks-helper{
+  background:var(--s2);border:1px solid var(--border);border-radius:9px;padding:.9rem 1rem;
+}
+.sh-title{font-size:.75rem;font-weight:700;color:var(--txt2);margin-bottom:.6rem;text-transform:uppercase}
+.sh-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:.35rem;font-size:.8rem}
+.sh-row:last-child{margin-bottom:0}
+.sh-label{color:var(--txt3)}
+.sh-val{font-family:var(--mono);color:var(--acc);font-weight:600}
+.copy-btn{font-size:.62rem;padding:.1rem .4rem;background:var(--s3);border:1px solid var(--border);
+  color:var(--txt3);border-radius:4px;cursor:pointer;margin-right:.3rem}
+.copy-btn:hover{color:var(--txt)}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--s3);border-radius:3px}
+
+/* ── UTILS ── */
+.section-title{font-size:.7rem;font-weight:700;color:var(--txt3);
+  text-transform:uppercase;letter-spacing:.07em;margin-bottom:.4rem}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="tb-icon">🔒</div>
+  <div>
+    <div class="tb-title">MasterDnsVPN</div>
+    <div class="tb-sub">رابط گرافیکی ویندوز — نسخه ۲.۰</div>
+  </div>
+  <div class="tb-spacer"></div>
+  <div class="status-pill" id="statusPill">
+    <div class="dot"></div>
+    <span id="statusText">آماده</span>
+  </div>
+</div>
+
+<!-- MAIN LAYOUT -->
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sbi active" title="اتصال" onclick="showPage('connect',this)">🔌</div>
+    <div class="sbi" title="لاگ‌ها" onclick="showPage('logs',this)">📋</div>
+    <div class="sbi" title="آمار" onclick="showPage('stats',this)">📊</div>
+    <div class="sbi-spacer"></div>
+    <div class="sbi" title="راهنما" onclick="showPage('help',this)">❓</div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="main">
+
+    <!-- ══ PAGE: CONNECT ══════════════════════════════════════════════════════ -->
+    <div class="page active" id="page-connect">
+
+      <div id="alertBox" class="alert alert-info hidden">
+        <span id="alertMsg"></span>
+      </div>
+
+      <div class="section-title">تنظیمات اتصال</div>
+      <div class="connect-grid">
+        <div class="field full">
+          <label>دامنه تونل سرور</label>
+          <input id="fDomain" type="text" placeholder="v.yourdomain.com" spellcheck="false">
+        </div>
+        <div class="field">
+          <label>کلید رمزنگاری</label>
+          <input id="fKey" type="password" placeholder="shared secret key" spellcheck="false">
+        </div>
+        <div class="field">
+          <label>روش رمزنگاری</label>
+          <select id="fMethod">
+            <option value="5" selected>AES-256-GCM (توصیه‌شده)</option>
+            <option value="2">XChaCha20-Poly1305</option>
+            <option value="4">AES-192-GCM</option>
+            <option value="3">AES-128-GCM</option>
+            <option value="1">XOR (ناامن)</option>
+            <option value="0">بدون رمز</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>پورت SOCKS5 محلی</label>
+          <input id="fPort" type="number" value="18000" min="1" max="65535">
+        </div>
+        <div class="field">
+          <label>استراتژی Load Balancing</label>
+          <select id="fStrategy">
+            <option value="5" selected>HybridScore (پیشنهادی)</option>
+            <option value="1">RoundRobin</option>
+            <option value="2">LeastLatency</option>
+            <option value="3">LeastLoss</option>
+            <option value="4">Random</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label>DNS Resolvers (هر خط یک آدرس)</label>
+          <textarea id="fResolvers" rows="4" spellcheck="false">8.8.8.8
+8.8.4.4
+1.1.1.1
+9.9.9.9</textarea>
+        </div>
+
+        <div class="btn-row">
+          <button class="btn btn-connect" id="btnConnect" onclick="doConnect()">
+            ⚡ اتصال
+          </button>
+          <button class="btn btn-stop" id="btnStop" onclick="doStop()" disabled>
+            🔌 قطع
+          </button>
+          <button class="btn btn-secondary" onclick="showPage('logs',document.querySelector(\'.sbi:nth-child(2)\'))">
+            📋 لاگ‌ها
+          </button>
+        </div>
+      </div>
+
+      <div class="socks-helper" id="socksHelper" style="margin-top:auto">
+        <div class="sh-title">تنظیم پراکسی SOCKS5</div>
+        <div class="sh-row">
+          <span class="sh-label">پروتکل</span>
+          <span class="sh-val">SOCKS5</span>
+        </div>
+        <div class="sh-row">
+          <span class="sh-label">آدرس</span>
+          <div><button class="copy-btn" onclick="copyText('127.0.0.1')">کپی</button><span class="sh-val">127.0.0.1</span></div>
+        </div>
+        <div class="sh-row">
+          <span class="sh-label">پورت</span>
+          <div><button class="copy-btn" onclick="copyText(document.getElementById('fPort').value)">کپی</button><span class="sh-val" id="showPort">18000</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: LOGS ══════════════════════════════════════════════════════════ -->
+    <div class="page" id="page-logs">
+      <div class="log-toolbar">
+        <span onclick="clearLog()">🗑 پاک کردن</span>
+        <span id="autoScrollBtn" onclick="toggleAutoScroll()">↓ اسکرول خودکار: روشن</span>
+        <div style="flex:1"></div>
+        <div class="log-filters">
+          <span class="lf active-info" id="lf-info" onclick="toggleFilter('info')">INFO</span>
+          <span class="lf active-warn" id="lf-warn" onclick="toggleFilter('warn')">WARN</span>
+          <span class="lf active-err"  id="lf-err"  onclick="toggleFilter('error')">ERR</span>
+        </div>
+      </div>
+      <div class="log-area" id="logArea">
+        <div class="log-empty">لاگی وجود ندارد — ابتدا اتصال برقرار کنید</div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: STATS ══════════════════════════════════════════════════════════ -->
+    <div class="page" id="page-stats">
+      <div class="section-title">آمار اتصال</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">وضعیت</div>
+          <div class="stat-val" id="stat-status" style="font-size:1rem">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Process ID</div>
+          <div class="stat-val val-ok" id="stat-pid">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">مدت اتصال</div>
+          <div class="stat-val" id="stat-uptime">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">پورت SOCKS5</div>
+          <div class="stat-val val-ok" id="stat-port">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">دامنه</div>
+          <div class="stat-val" id="stat-domain" style="font-size:.85rem;word-break:break-all">—</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">روش رمزنگاری</div>
+          <div class="stat-val" id="stat-method" style="font-size:.85rem">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ PAGE: HELP ══════════════════════════════════════════════════════════ -->
+    <div class="page" id="page-help">
+      <div class="section-title">راهنما</div>
+      <div style="font-size:.82rem;line-height:2;color:var(--txt2);overflow-y:auto;padding-left:.5rem">
+        <p style="color:var(--txt);font-weight:700;margin-bottom:.5rem">۳ قدم برای اتصال:</p>
+        <p>① <strong style="color:var(--acc)">دامنه</strong> و <strong style="color:var(--acc)">کلید</strong> سرور را وارد کنید</p>
+        <p>② دکمه <strong style="color:var(--ok)">اتصال</strong> را بزنید</p>
+        <p>③ در تنظیمات سیستم/مرورگر، پراکسی را روی <strong style="color:var(--acc)">SOCKS5 — 127.0.0.1:18000</strong> تنظیم کنید</p>
+        <br>
+        <p style="color:var(--txt);font-weight:700;margin-bottom:.5rem">مشکل رایج:</p>
+        <p>❌ <em>باینری یافت نشد</em> → فایل <code style="color:var(--acc)">masterdnsvpn-client.exe</code> را کنار این EXE بگذارید</p>
+        <p>❌ <em>Session Init failed</em> → دامنه یا کلید اشتباه است</p>
+        <p>❌ <em>MTU failed</em> → resolver ها را تغییر دهید</p>
+        <br>
+        <p style="color:var(--txt);font-weight:700;margin-bottom:.5rem">لینک‌های مفید:</p>
+        <p>📦 <a href="#" onclick="openLink('https://github.com/masterking32/MasterDnsVPN/releases')" style="color:var(--acc)">دانلود باینری از GitHub Releases</a></p>
+        <p>📖 <a href="#" onclick="openLink('https://github.com/masterking32/MasterDnsVPN')" style="color:var(--acc)">مستندات کامل</a></p>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /layout -->
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let autoScroll   = true;
+let logFilters   = { info: true, warn: true, error: true };
+let pollInterval = null;
+let startedAt    = null;
+let uptimeInt    = null;
+let lastLogCount = 0;
+
+const methodNames = {
+  '0': 'بدون رمز', '1': 'XOR',
+  '2': 'XChaCha20-Poly1305', '3': 'AES-128-GCM',
+  '4': 'AES-192-GCM', '5': 'AES-256-GCM'
+};
+
+// ── Pages ─────────────────────────────────────────────────────────────────────
+function showPage(id, el) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.querySelectorAll('.sbi').forEach(s => s.classList.remove('active'));
+  if (el) el.classList.add('active');
+}
+
+// ── Alert ─────────────────────────────────────────────────────────────────────
+function showAlert(type, msg) {
+  const box = document.getElementById('alertBox');
+  box.className = 'alert alert-' + type;
+  document.getElementById('alertMsg').textContent = msg;
+  box.classList.remove('hidden');
+  if (type !== 'err') setTimeout(() => box.classList.add('hidden'), 5000);
+}
+
+// ── Status pill ───────────────────────────────────────────────────────────────
+function setStatus(state, label) {
+  const pill = document.getElementById('statusPill');
+  const txt  = document.getElementById('statusText');
+  pill.className = 'status-pill ' + state;
+  txt.textContent = label;
+}
+
+// ── Log rendering ─────────────────────────────────────────────────────────────
+function renderLogs(lines) {
+  const area = document.getElementById('logArea');
+  if (!lines || lines.length === 0) {
+    area.innerHTML = '<div class="log-empty">لاگی وجود ندارد</div>';
+    return;
+  }
+  const filtered = lines.filter(l => logFilters[l.level] !== false);
+  area.innerHTML = filtered.map(l => {
+    const cls = l.level === 'error' ? 'll-error' : l.level === 'warn' ? 'll-warn' : l.level === 'debug' ? 'll-debug' : 'll-info';
+    const lbl = l.level === 'error' ? 'ERR' : l.level.toUpperCase().slice(0, 4);
+    return `<div class="log-line"><span class="lt">${l.time}</span><span class="ll ${cls}">${lbl}</span><span class="lm">${escHtml(l.msg)}</span></div>`;
+  }).join('');
+  if (autoScroll) area.scrollTop = area.scrollHeight;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function clearLog() {
+  document.getElementById('logArea').innerHTML = '<div class="log-empty">لاگ پاک شد</div>';
+  lastLogCount = 0;
+}
+
+function toggleAutoScroll() {
+  autoScroll = !autoScroll;
+  document.getElementById('autoScrollBtn').textContent =
+    `↓ اسکرول خودکار: ${autoScroll ? 'روشن' : 'خاموش'}`;
+}
+
+function toggleFilter(type) {
+  logFilters[type] = !logFilters[type];
+  const el = document.getElementById('lf-' + type);
+  const map = { info: 'active-info', warn: 'active-warn', error: 'active-err' };
+  if (logFilters[type]) el.classList.add(map[type]);
+  else el.classList.remove(map[type]);
+}
+
+// ── Poll API ──────────────────────────────────────────────────────────────────
+async function pollStatus() {
+  try {
+    const [statusRes, logsRes] = await Promise.all([
+      fetch('/api/status').then(r => r.json()),
+      fetch('/api/logs').then(r => r.json())
+    ]);
+
+    if (statusRes.running) {
+      setStatus('connected', 'متصل');
+      document.getElementById('btnConnect').disabled = true;
+      document.getElementById('btnStop').disabled = false;
+      document.getElementById('stat-status').textContent = '✅ متصل';
+      document.getElementById('stat-status').className = 'stat-val val-ok';
+      document.getElementById('stat-pid').textContent = statusRes.pid || '—';
+    } else {
+      setStatus('', 'آماده');
+      document.getElementById('btnConnect').disabled = false;
+      document.getElementById('btnStop').disabled = true;
+      document.getElementById('stat-status').textContent = '⏹ قطع';
+      document.getElementById('stat-status').className = 'stat-val val-warn';
+      if (pollInterval && !statusRes.running) {
+        stopPolling();
+      }
+    }
+
+    if (logsRes && logsRes.length !== lastLogCount) {
+      lastLogCount = logsRes.length;
+      renderLogs(logsRes);
+    }
+  } catch(e) {}
+}
+
+function startPolling() {
+  if (pollInterval) return;
+  pollInterval = setInterval(pollStatus, 1200);
+  pollStatus();
+}
+
+function stopPolling() {
+  if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  if (uptimeInt) { clearInterval(uptimeInt); uptimeInt = null; }
+  startedAt = null;
+}
+
+// ── Uptime counter ────────────────────────────────────────────────────────────
+function startUptime() {
+  startedAt = Date.now();
+  uptimeInt = setInterval(() => {
+    const secs = Math.floor((Date.now() - startedAt) / 1000);
+    const h = String(Math.floor(secs/3600)).padStart(2,'0');
+    const m = String(Math.floor((secs%3600)/60)).padStart(2,'0');
+    const s = String(secs%60).padStart(2,'0');
+    document.getElementById('stat-uptime').textContent = `${h}:${m}:${s}`;
+  }, 1000);
+}
+
+// ── Connect ───────────────────────────────────────────────────────────────────
+async function doConnect() {
+  const domain = document.getElementById('fDomain').value.trim();
+  const key    = document.getElementById('fKey').value.trim();
+  if (!domain) { showAlert('warn', '❌ دامنه تونل را وارد کنید'); return; }
+  if (!key)    { showAlert('warn', '❌ کلید رمزنگاری را وارد کنید'); return; }
+
+  const method   = document.getElementById('fMethod').value;
+  const port     = parseInt(document.getElementById('fPort').value) || 18000;
+  const strategy = document.getElementById('fStrategy').value;
+  const resolvers = document.getElementById('fResolvers').value.trim();
+
+  setStatus('connecting', 'در حال اتصال...');
+  document.getElementById('btnConnect').disabled = true;
+
+  // Update stats page
+  document.getElementById('stat-domain').textContent = domain;
+  document.getElementById('stat-method').textContent = methodNames[method] || method;
+  document.getElementById('stat-port').textContent = port;
+  document.getElementById('showPort').textContent = port;
+
+  try {
+    const res = await fetch('/api/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        domain, key,
+        method: parseInt(method),
+        port, resolvers,
+        strategy: parseInt(strategy),
+        write_files: true
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      showAlert('err', '❌ ' + (data.error || 'خطای ناشناخته'));
+      setStatus('error', 'خطا');
+      document.getElementById('btnConnect').disabled = false;
+      return;
+    }
+    showAlert('ok', '✅ باینری با موفقیت راه‌اندازی شد');
+    startPolling();
+    startUptime();
+  } catch(e) {
+    showAlert('err', '❌ خطا در ارتباط با launcher: ' + e.message);
+    setStatus('error', 'خطا');
+    document.getElementById('btnConnect').disabled = false;
+  }
+}
+
+// ── Disconnect ────────────────────────────────────────────────────────────────
+async function doStop() {
+  await fetch('/api/stop', { method: 'POST' }).catch(() => {});
+  stopPolling();
+  setStatus('', 'قطع‌شده');
+  document.getElementById('btnConnect').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('stat-status').textContent = '⏹ قطع';
+  showAlert('info', '🔌 اتصال قطع شد');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function copyText(text) {
+  navigator.clipboard.writeText(text).catch(() => {});
+}
+
+function openLink(url) {
+  window.open(url, '_blank');
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(async function init() {
+  try {
+    const info = await fetch('/api/info').then(r => r.json());
+    if (!info.binary_found) {
+      showAlert('warn', '⚠ باینری masterdnsvpn-client.exe پیدا نشد — آن را کنار این برنامه قرار دهید');
+    } else {
+      showAlert('ok', `✅ باینری یافت شد: ${info.binary_path}`);
+    }
+  } catch(e) {}
+})();
+</script>
+</body>
+</html>
