@@ -1,0 +1,123 @@
+# ==============================================================================
+# MasterDnsVPN — کانفیگ نمونه (آماده استفاده با ویرایش جزئی)
+# ==============================================================================
+# ۱. DOMAINS را با دامنه تونل سرور خود جایگزین کنید
+# ۲. ENCRYPTION_KEY را با کلید مشترک با سرور پر کنید
+# ۳. DATA_ENCRYPTION_METHOD باید با سرور یکسان باشد
+# ==============================================================================
+
+# ── تنظیمات ضروری ─────────────────────────────────────────────────────────────
+
+# دامنه تونل — با دامنه سرور خود عوض کنید
+DOMAINS = ["v.yourdomain.com"]
+
+# روش رمزنگاری — باید با سرور یکسان باشد
+# 0=بدون رمز | 1=XOR | 2=XChaCha20 | 3=AES-128 | 4=AES-192 | 5=AES-256 (پیشنهادی)
+DATA_ENCRYPTION_METHOD = 5
+
+# کلید رمزنگاری — باید با کلید سرور یکسان باشد
+ENCRYPTION_KEY = ""
+
+# ── پراکسی محلی ──────────────────────────────────────────────────────────────
+
+PROTOCOL_TYPE = "SOCKS5"
+LISTEN_IP = "127.0.0.1"
+LISTEN_PORT = 18000
+SOCKS5_AUTH = false
+SOCKS5_USER = "master_dns_vpn"
+SOCKS5_PASS = "master_dns_vpn"
+
+# ── DNS محلی (اختیاری) ───────────────────────────────────────────────────────
+
+LOCAL_DNS_ENABLED = false
+LOCAL_DNS_IP = "127.0.0.1"
+LOCAL_DNS_PORT = 53
+LOCAL_DNS_CACHE_MAX_RECORDS = 10000
+LOCAL_DNS_CACHE_TTL_SECONDS = 14400.0
+LOCAL_DNS_PENDING_TIMEOUT_SECONDS = 300.0
+DNS_RESPONSE_FRAGMENT_TIMEOUT_SECONDS = 60.0
+LOCAL_DNS_CACHE_PERSIST_TO_FILE = true
+LOCAL_DNS_CACHE_FLUSH_INTERVAL_SECONDS = 60.0
+
+# ── Resolver و Balancing ──────────────────────────────────────────────────────
+
+# استراتژی: 1=Random 2=RoundRobin 3=LeastLoss(پیشنهادی) 4=Latency 5=Hybrid
+RESOLVER_BALANCING_STRATEGY = 3
+PACKET_DUPLICATION_COUNT = 3
+SETUP_PACKET_DUPLICATION_COUNT = 4
+STREAM_RESOLVER_FAILOVER_RESEND_THRESHOLD = 2
+STREAM_RESOLVER_FAILOVER_COOLDOWN = 2.5
+RECHECK_INACTIVE_SERVERS_ENABLED = true
+AUTO_DISABLE_TIMEOUT_SERVERS = true
+AUTO_DISABLE_TIMEOUT_WINDOW_SECONDS = 30.0
+BASE_ENCODE_DATA = false
+
+# ── فشرده‌سازی ────────────────────────────────────────────────────────────────
+
+UPLOAD_COMPRESSION_TYPE = 0
+DOWNLOAD_COMPRESSION_TYPE = 0
+COMPRESSION_MIN_SIZE = 120
+
+# ── MTU Discovery ─────────────────────────────────────────────────────────────
+
+MIN_UPLOAD_MTU = 38
+MIN_DOWNLOAD_MTU = 200
+MAX_UPLOAD_MTU = 150
+MAX_DOWNLOAD_MTU = 4000
+MTU_TEST_RETRIES = 2
+MTU_TEST_TIMEOUT = 2.0
+MTU_TEST_PARALLELISM = 32
+SAVE_MTU_SERVERS_TO_FILE = false
+
+# ── کارگرها و صف‌ها ───────────────────────────────────────────────────────────
+
+RX_TX_WORKERS = 4
+TUNNEL_PROCESS_WORKERS = 6
+TUNNEL_PACKET_TIMEOUT_SECONDS = 10.0
+DISPATCHER_IDLE_POLL_INTERVAL_SECONDS = 0.020
+RX_CHANNEL_SIZE = 4096
+SOCKS_UDP_ASSOCIATE_READ_TIMEOUT_SECONDS = 30.0
+CLIENT_TERMINAL_STREAM_RETENTION_SECONDS = 45.0
+CLIENT_CANCELLED_SETUP_RETENTION_SECONDS = 120.0
+
+# ── Session Retry ─────────────────────────────────────────────────────────────
+
+SESSION_INIT_RETRY_BASE_SECONDS = 1.0
+SESSION_INIT_RETRY_STEP_SECONDS = 1.0
+SESSION_INIT_RETRY_LINEAR_AFTER = 5
+SESSION_INIT_RETRY_MAX_SECONDS = 60.0
+SESSION_INIT_BUSY_RETRY_INTERVAL_SECONDS = 60.0
+SESSION_INIT_RACING_COUNT = 3
+
+# ── ARQ ───────────────────────────────────────────────────────────────────────
+
+MAX_PACKETS_PER_BATCH = 8
+ARQ_WINDOW_SIZE = 1000
+ARQ_INITIAL_RTO_SECONDS = 0.5
+ARQ_MAX_RTO_SECONDS = 3.0
+ARQ_CONTROL_INITIAL_RTO_SECONDS = 0.5
+ARQ_CONTROL_MAX_RTO_SECONDS = 2.0
+ARQ_MAX_CONTROL_RETRIES = 126
+ARQ_INACTIVITY_TIMEOUT_SECONDS = 1800.0
+ARQ_DATA_PACKET_TTL_SECONDS = 2400.0
+ARQ_CONTROL_PACKET_TTL_SECONDS = 1200.0
+ARQ_MAX_DATA_RETRIES = 126
+ARQ_DATA_NACK_MAX_GAP = 32
+ARQ_DATA_NACK_INITIAL_DELAY_SECONDS = 0.1
+ARQ_DATA_NACK_REPEAT_SECONDS = 0.8
+ARQ_TERMINAL_DRAIN_TIMEOUT_SECONDS = 120.0
+ARQ_TERMINAL_ACK_WAIT_TIMEOUT_SECONDS = 90.0
+
+# ── Ping ──────────────────────────────────────────────────────────────────────
+
+PING_AGGRESSIVE_INTERVAL_SECONDS = 0.100
+PING_LAZY_INTERVAL_SECONDS = 0.750
+PING_COOLDOWN_INTERVAL_SECONDS = 2.0
+PING_COLD_INTERVAL_SECONDS = 15.0
+PING_WARM_THRESHOLD_SECONDS = 8.0
+PING_COOL_THRESHOLD_SECONDS = 20.0
+PING_COLD_THRESHOLD_SECONDS = 30.0
+
+# ── لاگ ──────────────────────────────────────────────────────────────────────
+
+LOG_LEVEL = "INFO"

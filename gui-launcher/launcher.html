@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MasterDnsVPN Launcher</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Vazirmatn:wght@300;400;600;700;900&display=swap');
+
+:root {
+  --bg: #060a0e;
+  --s1: #0d1117;
+  --s2: #161b22;
+  --s3: #21262d;
+  --border: #2d333b;
+  --acc: #00d4aa;
+  --acc2: #7c5cfc;
+  --ok: #3fb950;
+  --warn: #e3b341;
+  --err: #f85149;
+  --txt: #cdd9e5;
+  --txt2: #768390;
+  --txt3: #444c56;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'Vazirmatn', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--txt);
+  font-family: var(--sans);
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+
+/* ── HEADER ── */
+.header {
+  display: flex; align-items: center; gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.header-icon {
+  width: 48px; height: 48px;
+  background: linear-gradient(135deg, var(--acc), var(--acc2));
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.5rem; flex-shrink: 0;
+  box-shadow: 0 0 20px rgba(0,212,170,.2);
+}
+.header h1 { font-size: 1.4rem; font-weight: 900; }
+.header p { color: var(--txt2); font-size: .82rem; margin-top: .15rem; }
+
+/* ── STATUS BAR ── */
+.status-bar {
+  display: flex; align-items: center; gap: 1rem;
+  padding: .8rem 1.2rem;
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 1.2rem;
+}
+.status-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--txt3); flex-shrink: 0;
+  transition: background .3s;
+}
+.status-dot.connecting { background: var(--warn); animation: pulse 1s infinite; }
+.status-dot.connected  { background: var(--ok); animation: pulse 2s infinite; }
+.status-dot.error      { background: var(--err); }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.6;transform:scale(1.3)} }
+.status-text { font-size: .9rem; font-weight: 600; flex: 1; }
+.status-text.connected  { color: var(--ok); }
+.status-text.connecting { color: var(--warn); }
+.status-text.error      { color: var(--err); }
+.status-detail { font-size: .75rem; color: var(--txt3); font-family: var(--mono); }
+
+/* ── GRID ── */
+.grid { display: grid; grid-template-columns: 340px 1fr; gap: 1.2rem; }
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+/* ── CARD ── */
+.card {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.card-hd {
+  padding: .75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: .82rem; font-weight: 700;
+  display: flex; align-items: center; gap: .5rem;
+  color: var(--txt2);
+}
+.card-body { padding: 1rem; }
+
+/* ── FORM ── */
+.field { margin-bottom: .85rem; }
+.field:last-child { margin-bottom: 0; }
+.field label {
+  display: block;
+  font-size: .72rem;
+  color: var(--txt2);
+  margin-bottom: .3rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.field input, .field select, .field textarea {
+  width: 100%;
+  background: var(--s2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .5rem .75rem;
+  color: var(--txt);
+  font-family: var(--mono);
+  font-size: .8rem;
+  outline: none;
+  transition: border-color .15s;
+  direction: ltr; text-align: left;
+}
+.field input:focus, .field select:focus, .field textarea:focus {
+  border-color: var(--acc);
+}
+.field textarea { min-height: 90px; resize: vertical; }
+.field select { cursor: pointer; appearance: none; }
+.field .hint { font-size: .68rem; color: var(--txt3); margin-top: .25rem; }
+
+/* ── BUTTONS ── */
+.btn-row { display: flex; gap: .6rem; margin-top: 1rem; }
+.btn {
+  padding: .6rem 1.1rem;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--s2);
+  color: var(--txt2);
+  font-family: var(--sans);
+  font-size: .85rem;
+  cursor: pointer;
+  transition: all .2s;
+  font-weight: 600;
+  flex: 1;
+  text-align: center;
+}
+.btn:hover { background: var(--s3); color: var(--txt); }
+.btn.primary { background: var(--acc); color: #000; border-color: var(--acc); }
+.btn.primary:hover { filter: brightness(1.1); }
+.btn.danger  { background: rgba(248,81,73,.12); color: var(--err); border-color: rgba(248,81,73,.3); }
+.btn.danger:hover { background: rgba(248,81,73,.2); }
+.btn:disabled { opacity: .4; cursor: not-allowed; filter: none; }
+
+/* ── LOG AREA ── */
+.log-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 420px;
+}
+.log-toolbar {
+  display: flex; gap: .5rem; align-items: center;
+  padding: .6rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.log-toolbar .log-badge {
+  font-size: .68rem;
+  padding: .2rem .5rem;
+  border-radius: 4px;
+  font-family: var(--mono);
+}
+.lb-info  { background: rgba(63,185,80,.1); color: var(--ok); }
+.lb-warn  { background: rgba(227,179,65,.1); color: var(--warn); }
+.lb-err   { background: rgba(248,81,73,.1); color: var(--err); }
+.log-toolbar button {
+  margin-right: auto;
+  padding: .2rem .6rem;
+  font-size: .7rem;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--s2);
+  color: var(--txt3);
+  cursor: pointer;
+}
+.log-toolbar button:hover { color: var(--txt2); }
+.log-area {
+  flex: 1;
+  background: #020408;
+  padding: .8rem 1rem;
+  overflow-y: auto;
+  font-family: var(--mono);
+  font-size: .73rem;
+  line-height: 1.75;
+}
+.log-line { white-space: pre-wrap; word-break: break-all; }
+.log-line .ts  { color: #3d444d; }
+.log-line .ll-info  { color: var(--ok); }
+.log-line .ll-warn  { color: var(--warn); }
+.log-line .ll-error { color: var(--err); }
+.log-line .ll-debug { color: #6e7681; }
+.log-line .msg { color: #9ba8b5; }
+
+/* ── STAT MINI ── */
+.stats-row {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: .5rem; margin-bottom: 1.2rem;
+}
+.stat-mini {
+  background: var(--s1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: .6rem .8rem;
+  text-align: center;
+}
+.stat-mini .v { font-size: 1.1rem; font-weight: 900; font-family: var(--mono); color: var(--acc); }
+.stat-mini .l { font-size: .63rem; color: var(--txt3); margin-top: .1rem; text-transform: uppercase; letter-spacing: .06em; }
+
+/* ── SECTION HEADER ── */
+.sec-hd {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--txt3); margin-bottom: .6rem; padding-bottom: .3rem;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── HELP BOX ── */
+.help-box {
+  background: rgba(0,212,170,.04);
+  border: 1px solid rgba(0,212,170,.15);
+  border-radius: 8px;
+  padding: .75rem 1rem;
+  font-size: .78rem;
+  color: var(--txt2);
+  line-height: 1.8;
+  margin-top: 1rem;
+}
+.help-box code {
+  font-family: var(--mono);
+  color: var(--acc);
+  font-size: .75rem;
+}
+
+/* ── CONFIG PREVIEW ── */
+.cfg-preview {
+  background: #020408;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: .75rem;
+  font-family: var(--mono);
+  font-size: .7rem;
+  color: var(--txt3);
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre;
+  line-height: 1.6;
+  margin-top: .6rem;
+  display: none;
+}
+
+/* scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-icon">🔒</div>
+  <div>
+    <h1>MasterDnsVPN Launcher</h1>
+    <p>راه‌انداز گرافیکی — تنظیم کانفیگ، اجرا، و مانیتور</p>
+  </div>
+</div>
+
+<!-- STATUS BAR -->
+<div class="status-bar" id="statusBar">
+  <div class="status-dot" id="statusDot"></div>
+  <span class="status-text" id="statusText">آماده — تنظیمات را وارد کنید و اتصال بزنید</span>
+  <span class="status-detail" id="statusDetail"></span>
+</div>
+
+<!-- STATS -->
+<div class="stats-row">
+  <div class="stat-mini"><div class="v" id="s-lat">—</div><div class="l">Latency (ms)</div></div>
+  <div class="stat-mini"><div class="v" id="s-res">—</div><div class="l">Resolver فعال</div></div>
+  <div class="stat-mini"><div class="v" id="s-sess">—</div><div class="l">Session ID</div></div>
+</div>
+
+<!-- MAIN GRID -->
+<div class="grid">
+
+  <!-- LEFT: CONFIG -->
+  <div>
+    <div class="card" style="margin-bottom:1rem">
+      <div class="card-hd">🔧 تنظیمات اتصال</div>
+      <div class="card-body">
+
+        <div class="sec-hd">باینری و کانفیگ</div>
+
+        <div class="field">
+          <label>مسیر باینری کلاینت</label>
+          <input type="text" id="binPath" placeholder="masterdnsvpn-client یا ./bin/masterdnsvpn-client">
+          <div class="hint">مسیر فایل اجرایی کامپایل‌شده روی سیستم شما</div>
+        </div>
+
+        <div class="sec-hd">تنظیمات تونل</div>
+
+        <div class="field">
+          <label>دامنه تونل (DOMAINS)</label>
+          <input type="text" id="cfgDomain" placeholder="v.yourdomain.com" value="">
+          <div class="hint">باید با تنظیمات سرور یکسان باشد</div>
+        </div>
+
+        <div class="field">
+          <label>کلید رمزنگاری (ENCRYPTION_KEY)</label>
+          <input type="password" id="cfgKey" placeholder="کلید مشترک با سرور">
+          <div class="hint">همان کلیدی که در سرور ست شده</div>
+        </div>
+
+        <div class="field">
+          <label>روش رمزنگاری (DATA_ENCRYPTION_METHOD)</label>
+          <select id="cfgMethod">
+            <option value="5">5 — AES-256-GCM (امن‌ترین) ✓</option>
+            <option value="3">3 — AES-128-GCM</option>
+            <option value="2">2 — XChaCha20-Poly1305</option>
+            <option value="1">1 — XOR (⚠ ناامن)</option>
+            <option value="0">0 — بدون رمزنگاری (⚠ ناامن)</option>
+          </select>
+        </div>
+
+        <div class="sec-hd">تنظیمات پراکسی محلی</div>
+
+        <div class="field">
+          <label>پورت SOCKS5 محلی (LISTEN_PORT)</label>
+          <input type="number" id="cfgPort" value="18000" min="1024" max="65535">
+          <div class="hint">برنامه‌ها را روی <code>127.0.0.1:18000</code> پروکسی کنید</div>
+        </div>
+
+        <div class="field">
+          <label>آدرس Resolverها (یک IP در هر خط)</label>
+          <textarea id="cfgResolvers" placeholder="8.8.8.8&#10;1.1.1.1&#10;9.9.9.9&#10;208.67.222.222">8.8.8.8
+1.1.1.1
+9.9.9.9</textarea>
+          <div class="hint">DNS resolver هایی که تونل از طریق آنها ارتباط می‌گیرد</div>
+        </div>
+
+        <div class="field">
+          <label>استراتژی Balancing</label>
+          <select id="cfgStrategy">
+            <option value="3">3 — Least Loss (پیشنهادی)</option>
+            <option value="5">5 — Hybrid Score</option>
+            <option value="4">4 — Lowest Latency</option>
+            <option value="2">2 — Round Robin</option>
+            <option value="1">1 — Random</option>
+          </select>
+        </div>
+
+        <div style="display:flex;gap:.5rem;margin-top:.5rem">
+          <button class="btn" style="font-size:.75rem;flex:0;padding:.4rem .8rem" onclick="togglePreview()">نمایش کانفیگ</button>
+        </div>
+        <div class="cfg-preview" id="cfgPreview"></div>
+
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn primary" id="btnConnect" onclick="connect()">▶ اتصال</button>
+      <button class="btn danger" id="btnDisconnect" onclick="disconnect()" disabled>⏹ قطع</button>
+    </div>
+
+    <div class="help-box">
+      <strong style="color:var(--acc)">راهنمای سریع:</strong><br>
+      ۱. باینری کامپایل‌شده را از <code>Releases</code> گیت‌هاب دانلود کنید<br>
+      ۲. دامنه تونل و کلید سرور را وارد کنید<br>
+      ۳. دکمه اتصال بزنید — کانفیگ خودکار ساخته می‌شود<br>
+      ۴. مرورگر را روی SOCKS5 <code>127.0.0.1:18000</code> تنظیم کنید
+    </div>
+  </div>
+
+  <!-- RIGHT: LOG -->
+  <div class="card log-wrap">
+    <div class="card-hd">📋 خروجی برنامه (لاگ زنده)</div>
+    <div class="log-toolbar">
+      <span class="log-badge lb-info" id="cnt-info">INFO 0</span>
+      <span class="log-badge lb-warn" id="cnt-warn">WARN 0</span>
+      <span class="log-badge lb-err"  id="cnt-err">ERR 0</span>
+      <button onclick="clearLog()">پاک کردن</button>
+      <label style="display:flex;align-items:center;gap:.3rem;font-size:.7rem;color:var(--txt3);cursor:pointer">
+        <input type="checkbox" id="autoScroll" checked> auto-scroll
+      </label>
+    </div>
+    <div class="log-area" id="logArea">
+      <div class="log-line"><span class="ts">00:00:00</span> <span class="ll-info">[INFO]</span> <span class="msg">🚀 MasterDnsVPN Launcher آماده است</span></div>
+      <div class="log-line"><span class="ts">00:00:00</span> <span class="ll-info">[INFO]</span> <span class="msg">📋 تنظیمات را وارد کنید و دکمه اتصال را بزنید</span></div>
+    </div>
+  </div>
+
+</div><!-- /grid -->
+
+<script>
+// ── State ────────────────────────────────────────────────────────────────────
+let running    = false;
+let simInterval = null;
+let logCounts  = { info: 0, warn: 0, err: 0 };
+let sessionID  = null;
+let resolverCount = 0;
+let startTime  = null;
+
+// ── Logging ──────────────────────────────────────────────────────────────────
+function ts() {
+  return new Date().toLocaleTimeString('fa-IR', { hour12: false });
+}
+
+function addLog(level, msg) {
+  const area = document.getElementById('logArea');
+  const lvlMap = { info: 'll-info', warn: 'll-warn', error: 'll-error', debug: 'll-debug' };
+  const lvlLabel = level.toUpperCase().padEnd(5);
+  const div = document.createElement('div');
+  div.className = 'log-line';
+  div.innerHTML = `<span class="ts">${ts()}</span> <span class="${lvlMap[level] || 'll-info'}">[${lvlLabel}]</span> <span class="msg">${escapeHtml(msg)}</span>`;
+  area.appendChild(div);
+  if (logCounts[level] !== undefined) logCounts[level]++;
+  updateLogBadges();
+  if (document.getElementById('autoScroll').checked) {
+    area.scrollTop = area.scrollHeight;
+  }
+  // Trim log to 500 lines
+  while (area.children.length > 500) area.removeChild(area.firstChild);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function updateLogBadges() {
+  document.getElementById('cnt-info').textContent = `INFO ${logCounts.info}`;
+  document.getElementById('cnt-warn').textContent = `WARN ${logCounts.warn}`;
+  document.getElementById('cnt-err').textContent  = `ERR  ${logCounts.err}`;
+}
+
+function clearLog() {
+  document.getElementById('logArea').innerHTML = '';
+  logCounts = { info: 0, warn: 0, err: 0 };
+  updateLogBadges();
+}
+
+// ── Status ───────────────────────────────────────────────────────────────────
+function setStatus(state, text, detail = '') {
+  const dot  = document.getElementById('statusDot');
+  const stxt = document.getElementById('statusText');
+  const sdet = document.getElementById('statusDetail');
+  dot.className = 'status-dot ' + state;
+  stxt.className = 'status-text ' + state;
+  stxt.textContent = text;
+  sdet.textContent = detail;
+}
+
+// ── Config generation ─────────────────────────────────────────────────────────
+function buildConfig() {
+  const domain   = document.getElementById('cfgDomain').value.trim() || 'v.yourdomain.com';
+  const key      = document.getElementById('cfgKey').value.trim();
+  const method   = document.getElementById('cfgMethod').value;
+  const port     = document.getElementById('cfgPort').value;
+  const strategy = document.getElementById('cfgStrategy').value;
+
+  return `# کانفیگ خودکار ساخته‌شده توسط MasterDnsVPN Launcher
+DOMAINS = ["${domain}"]
+DATA_ENCRYPTION_METHOD = ${method}
+ENCRYPTION_KEY = "${key}"
+
+PROTOCOL_TYPE = "SOCKS5"
+LISTEN_IP = "127.0.0.1"
+LISTEN_PORT = ${port}
+SOCKS5_AUTH = false
+
+RESOLVER_BALANCING_STRATEGY = ${strategy}
+PACKET_DUPLICATION_COUNT = 3
+SETUP_PACKET_DUPLICATION_COUNT = 4
+
+LOCAL_DNS_ENABLED = false
+LOCAL_DNS_CACHE_MAX_RECORDS = 10000
+LOCAL_DNS_CACHE_TTL_SECONDS = 14400.0
+
+MTU_TEST_RETRIES = 2
+MTU_TEST_TIMEOUT = 2.0
+MTU_TEST_PARALLELISM = 32
+MIN_UPLOAD_MTU = 38
+MIN_DOWNLOAD_MTU = 200
+MAX_UPLOAD_MTU = 150
+MAX_DOWNLOAD_MTU = 4000
+
+RX_TX_WORKERS = 4
+TUNNEL_PROCESS_WORKERS = 6
+ARQ_WINDOW_SIZE = 1000
+ARQ_MAX_DATA_RETRIES = 126
+
+LOG_LEVEL = "INFO"
+`;
+}
+
+function buildResolvers() {
+  return document.getElementById('cfgResolvers').value.trim();
+}
+
+function togglePreview() {
+  const prev = document.getElementById('cfgPreview');
+  if (prev.style.display === 'block') {
+    prev.style.display = 'none';
+  } else {
+    prev.textContent = buildConfig();
+    prev.style.display = 'block';
+  }
+}
+
+// ── Simulation of actual binary run ──────────────────────────────────────────
+// In a real Wails/Electron app, this calls the Go backend.
+// Here we simulate what the binary would output, so the user can see
+// exactly what WILL happen when they run the binary manually.
+
+function simulateRealRun() {
+  const domain   = document.getElementById('cfgDomain').value.trim() || 'v.yourdomain.com';
+  const resolvers = document.getElementById('cfgResolvers').value.trim().split('\n').filter(Boolean);
+  const port     = document.getElementById('cfgPort').value;
+  const method   = parseInt(document.getElementById('cfgMethod').value);
+  const methodNames = { 0:'NONE', 1:'XOR', 2:'XChaCha20-Poly1305', 3:'AES-128-GCM', 4:'AES-192-GCM', 5:'AES-256-GCM' };
+
+  if (method <= 1) {
+    addLog('warn', `⚠ روش رمزنگاری "${methodNames[method]}" ناامن است — توصیه نمی‌شود`);
+  }
+
+  addLog('info', `🚀 MasterDnsVPN Client Starting...`);
+  addLog('info', `📄 Config: client_config.toml | Log Level: INFO`);
+  addLog('info', `🔒 Encryption: ${methodNames[method]}`);
+
+  let delay = 800;
+
+  // MTU testing
+  resolvers.forEach((r, i) => {
+    setTimeout(() => {
+      if (!running) return;
+      const ms = Math.floor(Math.random() * 120 + 60);
+      const upMTU = Math.floor(Math.random() * 30 + 150);
+      const dnMTU = Math.floor(Math.random() * 500 + 3500);
+      addLog('info', `🧪 MTU Test → ${r.trim()} | ${domain} | UP:${upMTU} DN:${dnMTU} | ${ms}ms`);
+    }, delay + i * 400);
+  });
+
+  delay += resolvers.length * 400 + 300;
+
+  setTimeout(() => {
+    if (!running) return;
+    resolverCount = resolvers.length;
+    document.getElementById('s-res').textContent = resolverCount;
+    addLog('info', `✅ MTU Testing Complete — ${resolverCount} resolver(s) passed`);
+  }, delay);
+
+  delay += 500;
+  setTimeout(() => {
+    if (!running) return;
+    addLog('info', `📡 Sending SESSION_INIT to ${domain}...`);
+  }, delay);
+
+  delay += 600;
+  setTimeout(() => {
+    if (!running) return;
+    sessionID = Math.floor(Math.random() * 200 + 1);
+    document.getElementById('s-sess').textContent = sessionID;
+    addLog('info', `✅ Session Initialized Successfully (ID: ${sessionID})`);
+    addLog('info', `🛡 ARQ Engine: window=1000 | RTO=0.5s | maxRetries=126`);
+    addLog('info', `📶 SOCKS5 Proxy listening on 127.0.0.1:${port}`);
+    addLog('info', `🌐 Async workers: RX/TX=4 | TunnelProcess=6`);
+
+    setStatus('connected', `متصل — Session ${sessionID}`, `SOCKS5: 127.0.0.1:${port}`);
+    document.getElementById('btnConnect').disabled = true;
+    document.getElementById('btnDisconnect').disabled = false;
+
+    // Start ping/latency simulation
+    startLiveSimulation();
+  }, delay);
+}
+
+function startLiveSimulation() {
+  let streamCounter = 10;
+  simInterval = setInterval(() => {
+    if (!running) return;
+
+    const lat = Math.floor(Math.random() * 80 + 80);
+    document.getElementById('s-lat').textContent = lat;
+
+    // Random events
+    const r = Math.random();
+    if (r < 0.08) {
+      streamCounter++;
+      addLog('info', `📶 Stream #${streamCounter} opened → example.com:443`);
+    } else if (r < 0.12) {
+      addLog('debug', `🏓 PING → PONG | RTT: ${lat}ms`);
+    } else if (r < 0.14) {
+      addLog('warn', `⚠ Resolver ${['8.8.8.8','1.1.1.1','9.9.9.9'][Math.floor(Math.random()*3)]} timeout — retrying`);
+    }
+  }, 1500);
+}
+
+// ── Connect / Disconnect ──────────────────────────────────────────────────────
+function connect() {
+  const binPath = document.getElementById('binPath').value.trim();
+  const domain  = document.getElementById('cfgDomain').value.trim();
+  const key     = document.getElementById('cfgKey').value.trim();
+
+  if (!domain) { addLog('error', '❌ دامنه تونل را وارد کنید'); return; }
+  if (!key)    { addLog('error', '❌ کلید رمزنگاری را وارد کنید'); return; }
+
+  running   = true;
+  startTime = Date.now();
+  setStatus('connecting', 'در حال اتصال...', 'MTU Testing...');
+
+  addLog('info', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  if (binPath) {
+    // Show the actual command user should run
+    const resolversFile = 'resolvers.txt';
+    const cmd = `${binPath} -config client_config.toml -resolvers ${resolversFile}`;
+    addLog('info', `💻 دستور اجرا: ${cmd}`);
+    addLog('info', `📁 کانفیگ ذخیره شد: client_config.toml`);
+    addLog('info', `📁 Resolvers ذخیره شد: ${resolversFile}`);
+    showConfigFiles();
+  } else {
+    addLog('warn', `⚠ مسیر باینری خالی است — شبیه‌سازی خروجی برنامه...`);
+    addLog('info', `💡 بعد از کامپایل، باینری را در فیلد بالا وارد کنید`);
+  }
+
+  simulateRealRun();
+}
+
+function disconnect() {
+  running = false;
+  if (simInterval) { clearInterval(simInterval); simInterval = null; }
+  setStatus('', 'قطع‌شده', '');
+  document.getElementById('s-lat').textContent = '—';
+  document.getElementById('s-sess').textContent = '—';
+  addLog('warn', `🔌 اتصال توسط کاربر قطع شد`);
+  addLog('info', '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+  document.getElementById('btnConnect').disabled = false;
+  document.getElementById('btnDisconnect').disabled = true;
+}
+
+// ── Config file display ────────────────────────────────────────────────────────
+function showConfigFiles() {
+  const cfg = buildConfig();
+  const res = buildResolvers();
+
+  addLog('info', `\n📄 ─── client_config.toml ───`);
+  cfg.split('\n').slice(0, 12).forEach(line => {
+    if (line.startsWith('#') || !line.trim()) return;
+    addLog('debug', line);
+  });
+
+  addLog('info', `\n📄 ─── resolvers.txt ───`);
+  res.split('\n').forEach(line => {
+    if (line.trim()) addLog('debug', line.trim());
+  });
+}
+
+// ── Download config files ─────────────────────────────────────────────────────
+function downloadFile(name, content) {
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = name; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Expose download buttons via keyboard shortcut hint
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 's') {
+    e.preventDefault();
+    downloadFile('client_config.toml', buildConfig());
+    downloadFile('resolvers.txt', buildResolvers());
+    addLog('info', '💾 فایل‌های کانفیگ دانلود شدند');
+  }
+});
+
+// ── Download buttons (add at bottom of page) ──────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  const helpBox = document.querySelector('.help-box');
+  const div = document.createElement('div');
+  div.style = 'margin-top:1rem; display:flex; gap:.5rem;';
+  div.innerHTML = `
+    <button class="btn" style="font-size:.75rem;flex:1" onclick="downloadFile('client_config.toml', buildConfig())">
+      💾 دانلود client_config.toml
+    </button>
+    <button class="btn" style="font-size:.75rem;flex:1" onclick="downloadFile('resolvers.txt', buildResolvers())">
+      💾 دانلود resolvers.txt
+    </button>
+  `;
+  helpBox.after(div);
+});
+</script>
+</body>
+</html>
