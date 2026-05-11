@@ -1,0 +1,811 @@
+name: Build and Release (Go)
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  packages: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+# ==============================================================================
+# ساختار workflow:
+#   1. preflight   — تگ release می‌سازد
+#   2. build       — matrix: همه پلتفرم‌ها (Windows / Linux / macOS / Android)
+#                    روی Windows amd64: GUI هم build می‌شود و داخل ZIP می‌رود
+#   3. release     — همه artifact ها را به یک GitHub Release تبدیل می‌کند
+#   4. docker      — image چندپلتفرمی روی GHCR منتشر می‌کند
+# ==============================================================================
+
+jobs:
+
+  # ────────────────────────────────────────────────────────────────────────────
+  preflight:
+    name: Preflight — تگ‌سازی
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.get_tag.outputs.tag }}
+    steps:
+      - name: Print recommended secrets and guidance
+        run: |
+          echo "Recommended repository secrets for this workflow:"
+          echo " - GPG_SIGNING_KEY: (optional) ASCII-armored GPG private key for signing release artifacts"
+          echo " - CODE_SIGN_CERT: (optional) Windows code-signing certificate (base64)"
+          echo " - STORAGE_TOKEN: (optional) token for private artifact stores"
+          echo
+          echo "To add a secret: repository Settings → Secrets and variables → Actions → New repository secret"
+
+      - name: Generate Release Tag
+        id: get_tag
+        run: |
+          SHORT_SHA=$(echo ${GITHUB_SHA} | cut -c1-7)
+          TS=$(date -u +%Y.%m.%d.%H%M%S)
+          echo "tag=v${TS}-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "Generated Tag: v${TS}-${SHORT_SHA}"
+
+  # ────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build (${{ matrix.platform }} / ${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    needs: preflight
+    env:
+      CODE_SIGN_CERT: ${{ secrets.CODE_SIGN_CERT }}
+      CODE_SIGN_CERT_PASSWORD: ${{ secrets.CODE_SIGN_CERT_PASSWORD }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ── Windows ─────────────────────────────────────────────────────────
+          - os: windows-latest
+            platform: Windows
+            arch: amd64
+            ext: .exe
+            go_arch: amd64
+            go_os: windows
+            cgo_enabled: "0"
+            smoke_test: true
+            build_gui: true        # ← فقط amd64 — GUI اینجا build می‌شود
+
+          - os: windows-latest
+            platform: Windows
+            arch: x86
+            ext: .exe
+            go_arch: 386
+            go_os: windows
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          - os: windows-latest
+            platform: Windows
+            arch: arm64
+            ext: .exe
+            go_arch: arm64
+            go_os: windows
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          # ── Linux (modern) ──────────────────────────────────────────────────
+          - os: ubuntu-22.04
+            platform: Linux
+            arch: amd64
+            ext: ""
+            go_arch: amd64
+            go_os: linux
+            cgo_enabled: "0"
+            smoke_test: true
+            build_gui: false
+
+          - os: ubuntu-22.04
+            platform: Linux
+            arch: x86
+            ext: ""
+            go_arch: 386
+            go_os: linux
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          - os: ubuntu-24.04-arm
+            platform: Linux
+            arch: arm64
+            ext: ""
+            go_arch: arm64
+            go_os: linux
+            cgo_enabled: "0"
+            smoke_test: true
+            build_gui: false
+
+          - os: ubuntu-22.04
+            platform: Linux
+            arch: armv7
+            ext: ""
+            go_arch: arm
+            go_arm: "7"
+            go_os: linux
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          - os: ubuntu-22.04
+            platform: Linux
+            arch: armv6
+            ext: ""
+            go_arch: arm
+            go_arm: "6"
+            go_os: linux
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          - os: ubuntu-22.04
+            platform: Linux
+            arch: armv5
+            ext: ""
+            go_arch: arm
+            go_arm: "5"
+            go_os: linux
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          - os: ubuntu-22.04
+            platform: Linux
+            arch: riscv64
+            ext: ""
+            go_arch: riscv64
+            go_os: linux
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          - os: ubuntu-22.04
+            platform: Linux
+            arch: mips
+            ext: ""
+            go_arch: mips
+            go_os: linux
+            go_mips: softfloat
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          - os: ubuntu-22.04
+            platform: Linux
+            arch: mipsle
+            ext: ""
+            go_arch: mipsle
+            go_os: linux
+            go_mips: softfloat
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          - os: ubuntu-22.04
+            platform: Linux
+            arch: mips64
+            ext: ""
+            go_arch: mips64
+            go_os: linux
+            go_mips64: softfloat
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          - os: ubuntu-22.04
+            platform: Linux
+            arch: mips64le
+            ext: ""
+            go_arch: mips64le
+            go_os: linux
+            go_mips64: softfloat
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          # ── Linux-Legacy (static musl) ───────────────────────────────────
+          - os: ubuntu-latest
+            platform: Linux-Legacy
+            arch: amd64
+            ext: ""
+            go_arch: amd64
+            go_os: linux
+            cgo_enabled: "0"
+            smoke_test: true
+            build_gui: false
+
+          - os: ubuntu-24.04-arm
+            platform: Linux-Legacy
+            arch: arm64
+            ext: ""
+            go_arch: arm64
+            go_os: linux
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          # ── macOS ────────────────────────────────────────────────────────
+          - os: macos-latest
+            platform: MacOS
+            arch: arm64
+            ext: ""
+            go_arch: arm64
+            go_os: darwin
+            cgo_enabled: "0"
+            smoke_test: true
+            build_gui: false
+
+          - os: macos-latest
+            platform: MacOS
+            arch: amd64
+            ext: ""
+            go_arch: amd64
+            go_os: darwin
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          # ── Android (Termux) ─────────────────────────────────────────────
+          - os: ubuntu-22.04
+            platform: Termux
+            arch: arm64
+            ext: ""
+            go_arch: arm64
+            go_os: android
+            cgo_enabled: "0"
+            smoke_test: false
+            build_gui: false
+
+          - os: ubuntu-22.04
+            platform: Termux
+            arch: armv7
+            ext: ""
+            go_arch: arm
+            go_arm: "7"
+            go_os: android
+            cgo_enabled: "1"
+            android_ndk: true
+            android_api: "21"
+            android_cc: armv7a-linux-androideabi21-clang
+            android_cxx: armv7a-linux-androideabi21-clang++
+            smoke_test: false
+            build_gui: false
+
+    steps:
+
+      # ── Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Go setup ────────────────────────────────────────────────────────────
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      # ── Android NDK (only for Android CGO builds) ────────────────────────
+      - name: Set up Java 17 for Android builds
+        if: ${{ matrix.android_ndk }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        if: ${{ matrix.android_ndk }}
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        if: ${{ matrix.android_ndk }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager --sdk_root="${ANDROID_SDK_ROOT}" "ndk;27.2.12479018"
+          NDK_ROOT="${ANDROID_SDK_ROOT}/ndk/27.2.12479018"
+          test -x "${NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.android_cc }}"
+          test -x "${NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.android_cxx }}"
+          echo "ANDROID_NDK_ROOT=${NDK_ROOT}" >> "$GITHUB_ENV"
+          echo "CC=${NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.android_cc }}" >> "$GITHUB_ENV"
+          echo "CXX=${NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin/${{ matrix.android_cxx }}" >> "$GITHUB_ENV"
+
+      # ── Windows resource (icon / version info) ───────────────────────────
+      - name: Install goversioninfo
+        if: ${{ matrix.go_os == 'windows' }}
+        run: |
+          go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@latest
+
+      - name: Generate Windows resource files
+        if: ${{ matrix.go_os == 'windows' }}
+        shell: bash
+        run: |
+          cd cmd/client && goversioninfo -platform-specific=true
+          cd ../server  && goversioninfo -platform-specific=true
+
+      # ── dist dir ─────────────────────────────────────────────────────────
+      - name: Prepare build directory
+        shell: bash
+        run: |
+          rm -rf dist || true
+          mkdir -p dist
+
+      # ── Build: Client ────────────────────────────────────────────────────
+      - name: Build client
+        env:
+          CGO_ENABLED: ${{ matrix.cgo_enabled }}
+          GOOS: ${{ matrix.go_os }}
+          GOARCH: ${{ matrix.go_arch }}
+          GOARM: ${{ matrix.go_arm }}
+          GOMIPS: ${{ matrix.go_mips }}
+          GOMIPS64: ${{ matrix.go_mips64 }}
+          CC: ${{ env.CC }}
+          CXX: ${{ env.CXX }}
+        run: |
+          go build \
+            -ldflags "-X masterdnsvpn-go/internal/version.BuildVersion=${{ needs.preflight.outputs.release_tag }} -s -w" \
+            -o dist/MasterDnsVPN_Client_${{ matrix.platform }}_${{ matrix.arch }}${{ matrix.ext }} \
+            ./cmd/client
+
+      # ── Build: Server ────────────────────────────────────────────────────
+      - name: Build server
+        env:
+          CGO_ENABLED: ${{ matrix.cgo_enabled }}
+          GOOS: ${{ matrix.go_os }}
+          GOARCH: ${{ matrix.go_arch }}
+          GOARM: ${{ matrix.go_arm }}
+          GOMIPS: ${{ matrix.go_mips }}
+          GOMIPS64: ${{ matrix.go_mips64 }}
+          CC: ${{ env.CC }}
+          CXX: ${{ env.CXX }}
+        run: |
+          go build \
+            -ldflags "-X masterdnsvpn-go/internal/version.BuildVersion=${{ needs.preflight.outputs.release_tag }} -s -w" \
+            -o dist/MasterDnsVPN_Server_${{ matrix.platform }}_${{ matrix.arch }}${{ matrix.ext }} \
+            ./cmd/server
+
+      # ── Build: Windows GUI ───────────────────────────────────────────────
+      # فقط Windows amd64 — پنجره مرورگر + HTTP server + اجرای باینری اصلی
+      - name: Build Windows GUI
+        if: ${{ matrix.build_gui == true }}
+        env:
+          CGO_ENABLED: "0"
+          GOOS: windows
+          GOARCH: amd64
+        shell: bash
+        run: |
+          cd windows-gui
+          go build \
+            -ldflags "-H windowsgui -s -w -X main.AppVersion=${{ needs.preflight.outputs.release_tag }}" \
+            -o ../dist/MasterDnsVPN_GUI_${{ matrix.platform }}_${{ matrix.arch }}.exe \
+            .
+
+      # ── Verify static binary (Linux-Legacy) ──────────────────────────────
+      - name: Verify Linux-Legacy binaries are not dynamically linked
+        if: ${{ matrix.platform == 'Linux-Legacy' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for bin in \
+            "dist/MasterDnsVPN_Client_${{ matrix.platform }}_${{ matrix.arch }}${{ matrix.ext }}" \
+            "dist/MasterDnsVPN_Server_${{ matrix.platform }}_${{ matrix.arch }}${{ matrix.ext }}"
+          do
+            echo "Inspecting $bin"
+            output="$(ldd "$bin" 2>&1 || true)"
+            echo "$output"
+            if [[ "$output" != *"not a dynamic executable"* && "$output" != *"statically linked"* ]]; then
+              echo "Expected static binary but $bin looks dynamically linked." >&2
+              exit 1
+            fi
+          done
+
+      # ── Config templates ──────────────────────────────────────────────────
+      - name: Bundle config templates
+        shell: bash
+        run: |
+          cp client_config.toml.simple  dist/client_config.toml    || true
+          cp client_resolvers.simple    dist/client_resolvers.txt  || true
+          cp server_config.toml.simple  dist/server_config.toml    || true
+
+      # ── Smoke-test config ─────────────────────────────────────────────────
+      - name: Prepare smoke-test config
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          val = "smoke-test-key-12345678901234567890123456789012"
+          for fname in ["dist/client_config.toml", "dist/server_config.toml"]:
+              p = Path(fname)
+              if not p.exists():
+                  continue
+              content = p.read_text(encoding="utf-8", errors="ignore")
+              content = re.sub(r'ENCRYPTION_KEY\s*=\s*""', f'ENCRYPTION_KEY = "{val}"', content)
+              if "server" in fname:
+                  content = re.sub(r'ENCRYPTION_KEY_FILE\s*=\s*".*?"', 'ENCRYPTION_KEY_FILE = "encrypt_key.txt"', content)
+              p.write_text(content, encoding="utf-8")
+          PY
+
+      # ── Smoke test (Windows) ──────────────────────────────────────────────
+      - name: Smoke test (Windows)
+        if: ${{ matrix.os == 'windows-latest' && matrix.smoke_test }}
+        shell: powershell
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+          Set-Location dist
+
+          foreach ($item in @(
+            @{ Bin = "MasterDnsVPN_Client_${{ matrix.platform }}_${{ matrix.arch }}${{ matrix.ext }}"; Cfg = "client_config.toml" },
+            @{ Bin = "MasterDnsVPN_Server_${{ matrix.platform }}_${{ matrix.arch }}${{ matrix.ext }}"; Cfg = "server_config.toml" }
+          )) {
+            Write-Host "Smoke testing $($item.Bin)..."
+            $proc = Start-Process -FilePath ".\$($item.Bin)" `
+              -ArgumentList "--config", $item.Cfg `
+              -PassThru -NoNewWindow `
+              -RedirectStandardOutput "$($item.Bin).out" `
+              -RedirectStandardError  "$($item.Bin).err"
+            Start-Sleep -Seconds 5
+            if ($proc.HasExited -and $proc.ExitCode -ne 0) {
+              Get-Content "$($item.Bin).out" -ErrorAction SilentlyContinue
+              Get-Content "$($item.Bin).err" -ErrorAction SilentlyContinue
+              throw "Smoke test failed with code $($proc.ExitCode)"
+            } else {
+              Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+      # ── Smoke test (Linux / macOS) ────────────────────────────────────────
+      - name: Smoke test (Linux / macOS)
+        if: ${{ matrix.smoke_test && (matrix.go_os == 'linux' || matrix.go_os == 'darwin') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          for item in \
+            "MasterDnsVPN_Client_${{ matrix.platform }}_${{ matrix.arch }}${{ matrix.ext }}:client_config.toml" \
+            "MasterDnsVPN_Server_${{ matrix.platform }}_${{ matrix.arch }}${{ matrix.ext }}:server_config.toml"
+          do
+            bin="${item%%:*}"
+            cfg="${item##*:}"
+            [ -f "$bin" ] || { echo "Not found: $bin" >&2; exit 1; }
+            chmod +x "$bin"
+            echo "Smoke testing $bin..."
+            "./$bin" --config "$cfg" >"$bin.out" 2>"$bin.err" &
+            pid=$!
+            sleep 5
+            if kill -0 "$pid" 2>/dev/null; then
+              kill "$pid" 2>/dev/null || true
+              wait "$pid" 2>/dev/null || true
+              echo "$bin: alive for 5s → OK"
+            else
+              wait "$pid" && code=0 || code=$?
+              echo "$bin: exited with code $code"
+              if [ "$code" -ne 0 ]; then
+                cat "$bin.out" || true
+                cat "$bin.err" || true
+              fi
+            fi
+          done
+
+      # ── README → HTML ─────────────────────────────────────────────────────
+      - name: Set up Python for README conversion
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install documentation dependencies
+        run: pip install markdown
+
+      - name: Convert README files to HTML
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import markdown
+
+          css = """
+          :root { color-scheme: light dark; }
+          body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            line-height: 1.7;
+            background: #0b1020;
+            color: #e8eefc;
+          }
+          .wrap { max-width: 980px; margin: 0 auto; padding: 40px 24px 56px; }
+          h1,h2,h3 { line-height: 1.25; }
+          h1 { font-size: 2rem; margin-top: 0; }
+          a { color: #8ec5ff; }
+          pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+          pre { padding: 14px 16px; border-radius: 10px; overflow-x: auto; background: #111a33; border: 1px solid #233154; }
+          code { background: #15203f; padding: 0.12em 0.3em; border-radius: 6px; }
+          table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+          th, td { border: 1px solid #2a3963; padding: 8px 10px; text-align: left; }
+          blockquote { margin: 16px 0; padding: 10px 14px; border-left: 4px solid #5b84ff; background: #101735; }
+          """
+          css_fa = "body { direction: rtl; text-align: right; } table { direction: rtl; } th, td { text-align: right; }"
+
+          docs = [
+            ("README.MD",    "MasterDnsVPN Documentation",      "README.html",    False),
+            ("README_FA.MD", "MasterDnsVPN Documentation (FA)", "README_FA.html", True),
+          ]
+          dist = Path("dist")
+          dist.mkdir(parents=True, exist_ok=True)
+
+          for src_name, title, out_name, is_fa in docs:
+            src = Path(src_name)
+            if not src.exists():
+              continue
+            lang = "fa" if is_fa else "en"
+            dir_ = "rtl" if is_fa else "ltr"
+            main_style = ' style="direction: rtl; text-align: right;"' if is_fa else ""
+            page_css = css + css_fa if is_fa else css
+            body = markdown.markdown(
+              src.read_text(encoding="utf-8", errors="ignore"),
+              extensions=["fenced_code", "tables", "toc", "sane_lists"],
+              output_format="html5",
+            )
+            html = f"""<!doctype html>
+          <html lang="{lang}" dir="{dir_}">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>{title}</title>
+            <style>{page_css}</style>
+          </head>
+          <body><main class="wrap"{main_style}>{body}</main></body>
+          </html>"""
+            (dist / out_name).write_text(html, encoding="utf-8")
+          PY
+
+      # ── Package (Windows) ─────────────────────────────────────────────────
+      - name: Package artifacts (Windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: powershell
+        run: |
+          Set-StrictMode -Version Latest
+          Set-Location dist
+
+          $platform  = '${{ matrix.platform }}'
+          $arch      = '${{ matrix.arch }}'
+          $ext       = '${{ matrix.ext }}'
+          $tag       = '${{ needs.preflight.outputs.release_tag }}'
+          $archUpper = $arch.ToUpper()
+
+          $clientBase = "MasterDnsVPN_Client_${platform}_${archUpper}"
+          $serverBase = "MasterDnsVPN_Server_${platform}_${archUpper}"
+          $clientExe  = "${clientBase}_${tag}${ext}"
+          $serverExe  = "${serverBase}_${tag}${ext}"
+
+          $clientOrig = "MasterDnsVPN_Client_${platform}_${arch}${ext}"
+          $serverOrig = "MasterDnsVPN_Server_${platform}_${arch}${ext}"
+          if (Test-Path $clientOrig) { Rename-Item $clientOrig $clientExe -Force }
+          if (Test-Path $serverOrig) { Rename-Item $serverOrig $serverExe -Force }
+
+          # ── ZIP کلاینت (+ GUI اگر وجود داشت) ───────────────────────────
+          $clientFiles = [System.Collections.ArrayList]@($clientExe, "client_config.toml", "client_resolvers.txt")
+          $guiExe = "MasterDnsVPN_GUI_${platform}_${arch}.exe"
+          if (Test-Path $guiExe) {
+            # GUI را هم با نام ثابت rename کن تا کاربر سردرگم نشود
+            $guiExeFinal = "MasterDnsVPN_GUI_${tag}.exe"
+            Copy-Item $guiExe $guiExeFinal -Force
+            $clientFiles.Add($guiExeFinal) | Out-Null
+            Write-Host "GUI included: $guiExeFinal"
+          }
+          if (Test-Path "README.html")    { $clientFiles.Add("README.html")    | Out-Null }
+          if (Test-Path "README_FA.html") { $clientFiles.Add("README_FA.html") | Out-Null }
+
+          Compress-Archive -Path $clientFiles.ToArray() -DestinationPath "${clientBase}.zip" -Force
+          Compress-Archive -Path $serverExe,"server_config.toml" -DestinationPath "${serverBase}.zip" -Force
+
+          # ── SHA256 ────────────────────────────────────────────────────────
+          $hashes = @()
+          foreach ($f in @("${clientBase}.zip", "${serverBase}.zip")) {
+            if (Test-Path $f) { $hashes += $f }
+          }
+          if ($hashes.Count -gt 0) {
+            Get-FileHash -Algorithm SHA256 $hashes |
+              ForEach-Object { "{0}  {1}" -f $_.Hash.ToLowerInvariant(), (Split-Path $_.Path -Leaf) } |
+              Set-Content "SHA256SUMS.txt"
+          }
+
+      # ── Package (Linux / macOS / Android) ────────────────────────────────
+      - name: Package artifacts (non-Windows)
+        if: ${{ matrix.os != 'windows-latest' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+
+          ARCH_UPPER=$(echo "${{ matrix.arch }}" | tr '[:lower:]' '[:upper:]')
+          TAG="${{ needs.preflight.outputs.release_tag }}"
+          PLATFORM="${{ matrix.platform }}"
+
+          CLIENT_BASE="MasterDnsVPN_Client_${PLATFORM}_${ARCH_UPPER}"
+          SERVER_BASE="MasterDnsVPN_Server_${PLATFORM}_${ARCH_UPPER}"
+          CLIENT_EXE="${CLIENT_BASE}_${TAG}${{ matrix.ext }}"
+          SERVER_EXE="${SERVER_BASE}_${TAG}${{ matrix.ext }}"
+
+          [ -f "MasterDnsVPN_Client_${PLATFORM}_${{ matrix.arch }}${{ matrix.ext }}" ] && \
+            mv "MasterDnsVPN_Client_${PLATFORM}_${{ matrix.arch }}${{ matrix.ext }}" "${CLIENT_EXE}" || true
+          [ -f "MasterDnsVPN_Server_${PLATFORM}_${{ matrix.arch }}${{ matrix.ext }}" ] && \
+            mv "MasterDnsVPN_Server_${PLATFORM}_${{ matrix.arch }}${{ matrix.ext }}" "${SERVER_EXE}" || true
+
+          CLIENT_FILES=("${CLIENT_EXE}" "client_config.toml" "client_resolvers.txt")
+          [ -f "README.html" ]    && CLIENT_FILES+=("README.html")
+          [ -f "README_FA.html" ] && CLIENT_FILES+=("README_FA.html")
+
+          zip  -j "${CLIENT_BASE}.zip" "${CLIENT_FILES[@]}" || true
+          tar  -czf "${CLIENT_BASE}.tar.gz" "${CLIENT_FILES[@]}" || true
+          zip  -j "${SERVER_BASE}.zip" "${SERVER_EXE}" "server_config.toml" || true
+          tar  -czf "${SERVER_BASE}.tar.gz" "${SERVER_EXE}" "server_config.toml" || true
+
+          sha256sum "${CLIENT_BASE}.zip" "${CLIENT_BASE}.tar.gz" \
+                    "${SERVER_BASE}.zip" "${SERVER_BASE}.tar.gz" > SHA256SUMS.txt
+
+      # ── Upload artifact ───────────────────────────────────────────────────
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+
+  # ────────────────────────────────────────────────────────────────────────────
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [preflight, build]
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_assets
+
+      - name: List downloaded artifacts
+        run: |
+          echo "=== release_assets ==="
+          find release_assets -maxdepth 4 -type f | sort
+
+      - name: Build release notes
+        id: notes
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const head = process.env.GITHUB_SHA;
+            let prevTag = null;
+            try {
+              const latest = await github.rest.repos.getLatestRelease({ owner, repo });
+              prevTag = latest.data.tag_name;
+            } catch (_) {}
+
+            let commits = [];
+            if (prevTag) {
+              const comp = await github.rest.repos.compareCommits({ owner, repo, base: prevTag, head });
+              commits = comp.data.commits || [];
+            } else {
+              const list = await github.rest.repos.listCommits({ owner, repo, sha: head, per_page: 100 });
+              commits = list.data || [];
+            }
+
+            const contributors = new Map();
+            const prSet = new Map();
+            for (const c of commits) {
+              const login = c.author?.login ? `@${c.author.login}` : c.commit?.author?.name || 'unknown';
+              contributors.set(login, (contributors.get(login) || 0) + 1);
+              try {
+                const prs = await github.rest.repos.listPullRequestsAssociatedWithCommit({ owner, repo, commit_sha: c.sha });
+                for (const pr of prs.data) {
+                  if (pr.merged_at) prSet.set(pr.number, pr);
+                }
+              } catch (_) {}
+            }
+
+            let body = prevTag
+              ? `**تغییرات نسبت به ${prevTag}**\n\n`
+              : `**اولین release**\n\n`;
+
+            body += `### 📝 Commits\n`;
+            for (const c of commits.slice(-60)) {
+              const msg = c.commit.message.split('\n')[0];
+              body += `- ${msg} ([${c.sha.slice(0,7)}](https://github.com/${owner}/${repo}/commit/${c.sha}))\n`;
+            }
+            if (prSet.size > 0) {
+              body += `\n### 🔀 Merged PRs\n`;
+              for (const pr of prSet.values())
+                body += `- [#${pr.number}](${pr.html_url}) ${pr.title}\n`;
+            }
+            if (contributors.size > 0) {
+              body += `\n### 👤 Contributors\n`;
+              for (const [name, cnt] of contributors.entries())
+                body += `- ${name} — ${cnt} commit(s)\n`;
+            }
+
+            body += `\n---\n`;
+            body += `> 🪟 **Windows GUI** — \`MasterDnsVPN_GUI_*.exe\` را کنار \`MasterDnsVPN_Client_*.exe\` قرار دهید و اجرا کنید.\n`;
+            body += `> 🐧 **Linux/macOS** — از \`.tar.gz\` استفاده کنید.\n`;
+
+            return { body };
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build unified SHA256SUMS
+        run: |
+          find release_assets -type f \( -name '*.zip' -o -name '*.tar.gz' \) -print0 \
+            | sort -z \
+            | xargs -0 sha256sum > release_assets/SHA256SUMS.txt
+          cat release_assets/SHA256SUMS.txt
+
+      - name: Fail if no artifacts
+        run: |
+          cnt=$(find release_assets -type f | wc -l)
+          echo "Artifact files: $cnt"
+          [ "$cnt" -gt 0 ] || { echo "No artifacts found!" >&2; exit 1; }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.preflight.outputs.release_tag }}
+          name: "Release ${{ needs.preflight.outputs.release_tag }}"
+          body: ${{ fromJson(steps.notes.outputs.result).body }}
+          files: |
+            release_assets/**/*.zip
+            release_assets/**/*.tar.gz
+            release_assets/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ────────────────────────────────────────────────────────────────────────────
+  docker-release:
+    name: Docker Image (GHCR)
+    runs-on: ubuntu-latest
+    needs: [preflight, release]
+    permissions:
+      contents: read
+      packages: write
+    env:
+      PLATFORMS: linux/amd64,linux/arm/v5,linux/arm/v7,linux/arm64/v8,linux/mips64le
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push multi-arch Docker image
+        shell: bash
+        env:
+          REGISTRY_KIND: ghcr
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.release_tag }}
+          IMAGE_REFS: >-
+            masterking32/masterdnsvpn:${{ needs.preflight.outputs.release_tag }},
+            masterking32/masterdnsvpn:latest
+          PLATFORMS: ${{ env.PLATFORMS }}
+        run: |
+          chmod +x docker/buildx-multi-platform.sh
+          docker/buildx-multi-platform.sh
