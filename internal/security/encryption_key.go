@@ -12,19 +12,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"masterdnsvpn-go/internal/config"
 )
 
-// InsecureMethodWarning is non-nil when the configured method offers no real security.
-var InsecureMethodWarning = map[int]string{
-	0: "⚠ SECURITY WARNING: Encryption method NONE — all VPN traffic is plaintext!",
-	1: "⚠ SECURITY WARNING: XOR cipher is NOT real encryption and is trivially breakable.",
-}
-
-// EncryptionKeyInfo holds the result of key loading or generation.
 type EncryptionKeyInfo struct {
 	MethodID   int
 	MethodName string
@@ -39,23 +31,6 @@ func EnsureServerEncryptionKey(cfg config.ServerConfig) (EncryptionKeyInfo, erro
 		MethodID:   cfg.DataEncryptionMethod,
 		MethodName: EncryptionMethodName(cfg.DataEncryptionMethod),
 		Path:       cfg.EncryptionKeyPath(),
-	}
-
-	// Warn about insecure methods.
-	if warn, bad := InsecureMethodWarning[cfg.DataEncryptionMethod]; bad {
-		fmt.Fprintln(os.Stderr, warn)
-	}
-
-	// Check parent directory permissions.
-	if dir := filepath.Dir(info.Path); dir != "" {
-		if st, err := os.Stat(dir); err == nil {
-			if st.Mode().Perm()&0o022 != 0 {
-				fmt.Fprintf(os.Stderr,
-					"⚠ SECURITY WARNING: key directory %q is world/group writable (mode %04o). "+
-						"Other users on this system may read or replace the encryption key.\n",
-					dir, st.Mode().Perm())
-			}
-		}
 	}
 
 	requiredLength := requiredKeyLength(cfg.DataEncryptionMethod)

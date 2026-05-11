@@ -10,15 +10,15 @@ package security
 import (
 	"crypto/aes"
 	"crypto/cipher"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"sync"
 
-	"golang.org/x/crypto/chacha20poly1305"
-	"golang.org/x/crypto/hkdf"
+	"golang.org/x/crypto/chacha20"
 
 	baseCodec "masterdnsvpn-go/internal/basecodec"
 	"masterdnsvpn-go/internal/config"
@@ -30,9 +30,8 @@ var (
 )
 
 const (
-	// xchacha20poly1305 nonce is 24 bytes; AEAD handles internally.
-	xchacha20NonceSize = 24
-	aesNonceSize       = 12
+	chachaNonceSize = 16
+	aesNonceSize    = 12
 )
 
 var cryptoBufferPool = sync.Pool{
@@ -81,7 +80,6 @@ func NewCodec(method int, rawKey string) (*Codec, error) {
 
 	switch method {
 	case 0:
-		// ⚠ WARNING: No encryption — all traffic is plaintext. NOT safe for production.
 		codec.encrypt = codec.noCrypto
 		codec.decrypt = codec.noCrypto
 	case 1:
@@ -252,57 +250,53 @@ func (c *Codec) chachaEncrypt(dst, data []byte) ([]byte, error) {
 		return dst, nil
 	}
 
-	aead, err := chacha20poly1305.NewX(c.key)
-	if err != nil {
-		return nil, fmt.Errorf("create xchacha20poly1305: %w", err)
-	}
-
-	reqSize := xchacha20NonceSize + len(data) + aead.Overhead()
+	reqSize := chachaNonceSize + len(data)
 	if cap(dst) < reqSize {
-		dst = make([]byte, xchacha20NonceSize, reqSize)
+		dst = make([]byte, reqSize)
 	} else {
-		dst = dst[:xchacha20NonceSize]
+		dst = dst[:reqSize]
 	}
 
-	nonce := dst[:xchacha20NonceSize]
+	nonce := dst[:chachaNonceSize]
 	if _, err := rand.Read(nonce); err != nil {
-		return nil, fmt.Errorf("generate xchacha20 nonce: %w", err)
+		return nil, fmt.Errorf("generate chacha20 nonce: %w", err)
 	}
 
-	dst = aead.Seal(dst, nonce, data, nil)
+	stream, err := chacha20.NewUnauthenticatedCipher(c.key, nonce[4:])
+	if err != nil {
+		return nil, err
+	}
+	stream.SetCounter(binary.LittleEndian.Uint32(nonce[:4]))
+	stream.XORKeyStream(dst[chachaNonceSize:], data)
 	return dst, nil
 }
 
 func (c *Codec) chachaDecrypt(dst, data []byte) ([]byte, error) {
 	if len(data) == 0 {
-		return nil, nil
+		return nil, nil // Return nil per original intention
 	}
-	if len(data) <= xchacha20NonceSize {
+	if len(data) <= chachaNonceSize {
 		return nil, ErrInvalidCiphertext
 	}
 
-	aead, err := chacha20poly1305.NewX(c.key)
-	if err != nil {
-		return nil, fmt.Errorf("create xchacha20poly1305: %w", err)
-	}
+	nonce := data[:chachaNonceSize]
+	ciphertext := data[chachaNonceSize:]
 
-	nonce := data[:xchacha20NonceSize]
-	ciphertext := data[xchacha20NonceSize:]
-
-	if cap(dst) == 0 {
-		dst = make([]byte, 0, len(ciphertext))
+	if cap(dst) < len(ciphertext) {
+		dst = make([]byte, len(ciphertext))
 	} else {
-		dst = dst[:0]
+		dst = dst[:len(ciphertext)]
 	}
 
-	plaintext, err := aead.Open(dst, nonce, ciphertext, nil)
+	stream, err := chacha20.NewUnauthenticatedCipher(c.key, nonce[4:])
 	if err != nil {
-		return nil, ErrInvalidCiphertext
+		return nil, err
 	}
-	return plaintext, nil
+	stream.SetCounter(binary.LittleEndian.Uint32(nonce[:4]))
+
+	stream.XORKeyStream(dst, ciphertext)
+	return dst, nil
 }
-
-
 
 func (c *Codec) makeAESEncryptor(aead cipher.AEAD) func(dst, src []byte) ([]byte, error) {
 	return func(dst, src []byte) ([]byte, error) {
@@ -370,21 +364,22 @@ func newAESGCM(key []byte) (cipher.AEAD, error) {
 	return aead, nil
 }
 
-// deriveKey uses HKDF-SHA256 for all methods to produce a well-structured key.
-// Salt is fixed but domain-separated per method to ensure different keys per mode.
 func deriveKey(method int, rawKey string) []byte {
+	bKey := []byte(rawKey)
 	targetLen := requiredDerivedKeyLength(method)
-	info := []byte(fmt.Sprintf("masterdnsvpn-method-%d", method))
-	salt := []byte("masterdnsvpn-kdf-salt-v1")
 
-	r := hkdf.New(sha256.New, []byte(rawKey), salt, info)
-	key := make([]byte, targetLen)
-	if _, err := io.ReadFull(r, key); err != nil {
-		// Fallback: sha256 truncated — should never happen with valid targetLen
-		sum := sha256.Sum256([]byte(rawKey))
-		copy(key, sum[:])
+	switch method {
+	case 2, 5:
+		sum := sha256.Sum256(bKey)
+		return sum[:]
+	case 3:
+		sum := md5.Sum(bKey)
+		return sum[:]
+	default:
+		key := make([]byte, targetLen)
+		copy(key, bKey)
+		return key
 	}
-	return key
 }
 
 func requiredDerivedKeyLength(method int) int {
